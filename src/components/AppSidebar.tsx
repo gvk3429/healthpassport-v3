@@ -9,6 +9,7 @@ import {
   Shield,
   Share2,
   Sparkles,
+  Stethoscope,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -25,6 +26,8 @@ export type Page =
   | "emergency-location"
   | "sharing"
   | "ask"
+  | "symptoms"
+  | "prediction"
   | "privacy"
   | "integrations"
   | "settings"
@@ -100,6 +103,16 @@ const mainNavigation: NavItem[] = [
     icon: Sparkles,
   },
   {
+    id: "symptoms",
+    label: "Symptoms Analyzer",
+    icon: Stethoscope,
+  },
+  {
+    id: "prediction",
+    label: "Disease Prediction",
+    icon: Activity,
+  },
+  {
     id: "privacy",
     label: "Privacy & Access",
     icon: KeyRound,
@@ -124,7 +137,6 @@ export default function AppSidebar({
 
   return (
     <>
-      {/* Mobile backdrop */}
       {mobileOpen && (
         <button
           type="button"
@@ -161,9 +173,6 @@ export default function AppSidebar({
           }
         `}
       >
-        {/* ===================================================
-            BRAND
-            =================================================== */}
         <div className="flex h-[88px] shrink-0 items-center border-b border-slate-100 px-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/20">
@@ -186,9 +195,6 @@ export default function AppSidebar({
           </div>
         </div>
 
-        {/* ===================================================
-            NAVIGATION
-            =================================================== */}
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-4">
           <div className="mb-3 px-3 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
             My Health
@@ -207,7 +213,9 @@ export default function AppSidebar({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => handleNavigate(item.id)}
+                  onClick={() =>
+                    handleNavigate(item.id)
+                  }
                   className={`
                     group
                     flex
@@ -218,24 +226,17 @@ export default function AppSidebar({
                     px-3
                     py-2.5
                     text-left
-                    transition
+                    transition-all
                     ${
                       isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        ? "bg-blue-50 text-blue-600 shadow-sm"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                     }
                   `}
                 >
                   <span
                     className={`
-                      flex
-                      h-8
-                      w-8
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-lg
-                      transition
+                      flex h-8 w-8 shrink-0 items-center justify-center rounded-lg
                       ${
                         isActive
                           ? "bg-white text-blue-600 shadow-sm"
@@ -244,108 +245,50 @@ export default function AppSidebar({
                     `}
                   >
                     <Icon
-                      size={15}
-                      strokeWidth={1.8}
+                      size={16}
+                      strokeWidth={
+                        isActive ? 2 : 1.8
+                      }
                     />
                   </span>
 
-                  <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">
+                  <span
+                    className={`
+                      min-w-0 flex-1 truncate text-[11px]
+                      ${
+                        isActive
+                          ? "font-bold"
+                          : "font-medium"
+                      }
+                    `}
+                  >
                     {item.label}
                   </span>
 
                   {item.badge && (
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-red-500 shadow-sm" />
+                    <span
+                      className={`
+                        h-2 w-2 shrink-0 rounded-full
+                        ${
+                          isActive
+                            ? "bg-rose-500"
+                            : "bg-rose-400"
+                        }
+                      `}
+                    />
                   )}
                 </button>
               );
             })}
           </nav>
-
-          {/* Patient profile */}
-          <div className="mt-5 border-t border-slate-100 pt-4">
-            <div className="mb-3 px-3 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-              Account
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleNavigate("profile")}
-              className={`
-                group
-                flex
-                w-full
-                items-center
-                gap-3
-                rounded-xl
-                px-3
-                py-2.5
-                text-left
-                transition
-                ${
-                  activePage === "profile"
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                }
-              `}
-            >
-              <span
-                className={`
-                  flex
-                  h-8
-                  w-8
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-lg
-                  ${
-                    activePage === "profile"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-slate-400 group-hover:text-slate-600"
-                  }
-                `}
-              >
-                <Heart
-                  size={15}
-                  strokeWidth={1.8}
-                />
-              </span>
-
-              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">
-                Patient Profile
-              </span>
-            </button>
-          </div>
         </div>
 
-        {/* ===================================================
-            HEALTHPASSPORT MESSAGE
-            =================================================== */}
-        <div className="shrink-0 px-2 pb-3">
-          <div className="overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-cyan-50 p-3">
-            <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-xl bg-white text-blue-500 shadow-sm">
-              <Heart
-                size={15}
-                fill="currentColor"
-              />
-            </div>
-
-            <p className="text-[10px] font-bold leading-4 text-blue-800">
-              Your health.
-              <br />
-              Your records.
-              <br />
-              Your control.
-            </p>
-          </div>
-        </div>
-
-        {/* ===================================================
-            SETTINGS
-            =================================================== */}
         <div className="shrink-0 border-t border-slate-100 p-2">
           <button
             type="button"
-            onClick={() => handleNavigate("settings")}
+            onClick={() =>
+              handleNavigate("settings")
+            }
             className={`
               group
               flex
@@ -356,23 +299,37 @@ export default function AppSidebar({
               px-3
               py-2.5
               text-left
-              transition
+              transition-all
               ${
                 activePage === "settings"
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-blue-50 text-blue-600"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
               }
             `}
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 group-hover:text-slate-600">
-              <Settings size={15} />
+              <Settings
+                size={16}
+                strokeWidth={1.8}
+              />
             </span>
 
-            <span className="text-[11px] font-semibold">
+            <span
+              className={`
+                text-[11px]
+                ${
+                  activePage === "settings"
+                    ? "font-bold"
+                    : "font-medium"
+                }
+              `}
+            >
               Settings
             </span>
           </button>
         </div>
+
+        
       </aside>
     </>
   );

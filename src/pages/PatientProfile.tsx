@@ -13,9 +13,11 @@ import {
   X,
 } from "lucide-react";
 
+import type { Page } from "../components/AppSidebar";
 import { addAuditEvent } from "../lib/privacyAudit";
 
-const PROFILE_STORAGE_KEY = "healthpassport-patient-profile-v1";
+const PROFILE_STORAGE_KEY =
+  "healthpassport-patient-profile-v1";
 
 export interface PatientProfileData {
   healthPassportId: string;
@@ -49,9 +51,10 @@ function getProfile(): PatientProfileData {
   }
 
   try {
-    const stored = window.localStorage.getItem(
-      PROFILE_STORAGE_KEY,
-    );
+    const stored =
+      window.localStorage.getItem(
+        PROFILE_STORAGE_KEY,
+      );
 
     if (!stored) {
       window.localStorage.setItem(
@@ -71,7 +74,9 @@ function getProfile(): PatientProfileData {
   }
 }
 
-function saveProfile(profile: PatientProfileData) {
+function saveProfile(
+  profile: PatientProfileData,
+) {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(
@@ -80,7 +85,9 @@ function saveProfile(profile: PatientProfileData) {
   );
 
   window.dispatchEvent(
-    new CustomEvent("healthpassport-profile-updated"),
+    new CustomEvent(
+      "healthpassport-profile-updated",
+    ),
   );
 }
 
@@ -95,7 +102,7 @@ function getInitials(name: string) {
 }
 
 interface PatientProfileProps {
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: Page) => void;
 }
 
 interface ProfileFieldProps {
@@ -116,7 +123,10 @@ function ProfileField({
     <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
-          <Icon size={16} strokeWidth={1.8} />
+          <Icon
+            size={16}
+            strokeWidth={1.8}
+          />
         </div>
 
         <div className="min-w-0">
@@ -137,70 +147,54 @@ export default function PatientProfile({
   onNavigate,
 }: PatientProfileProps) {
   const [profile, setProfile] =
-    useState<PatientProfileData>(() => getProfile());
+    useState<PatientProfileData>(() =>
+      getProfile(),
+    );
 
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] =
+    useState(false);
+
   const [draft, setDraft] =
-    useState<PatientProfileData>(() => getProfile());
+    useState<PatientProfileData>(() =>
+      getProfile(),
+    );
 
-  const [notice, setNotice] = useState<string | null>(
-    null,
-  );
+  const [saved, setSaved] =
+    useState(false);
+
+  const [showEmergencyInfo, setShowEmergencyInfo] =
+    useState(false);
 
   useEffect(() => {
-    const refresh = () => {
-      const nextProfile = getProfile();
+    const handleProfileUpdate = () => {
+      const next = getProfile();
 
-      setProfile(nextProfile);
-      setDraft(nextProfile);
+      setProfile(next);
+      setDraft(next);
     };
 
     window.addEventListener(
       "healthpassport-profile-updated",
-      refresh,
+      handleProfileUpdate,
     );
 
     return () => {
       window.removeEventListener(
         "healthpassport-profile-updated",
-        refresh,
+        handleProfileUpdate,
       );
     };
   }, []);
 
-  useEffect(() => {
-    if (!notice) return;
-
-    const timer = window.setTimeout(() => {
-      setNotice(null);
-    }, 3500);
-
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
-  const completeness = useMemo(() => {
-    const fields: Array<keyof PatientProfileData> = [
-      "fullName",
-      "dateOfBirth",
-      "gender",
-      "bloodGroup",
-      "mobile",
-      "email",
-      "location",
-      "emergencyContactName",
-      "emergencyContactPhone",
-    ];
-
-    const completed = fields.filter(
-      (field) => profile[field].trim().length > 0,
-    ).length;
-
-    return Math.round((completed / fields.length) * 100);
-  }, [profile]);
+  const initials = useMemo(
+    () => getInitials(profile.fullName),
+    [profile.fullName],
+  );
 
   const handleEdit = () => {
     setDraft(profile);
     setEditing(true);
+    setSaved(false);
   };
 
   const handleCancel = () => {
@@ -209,37 +203,26 @@ export default function PatientProfile({
   };
 
   const handleSave = () => {
-    const cleanedProfile: PatientProfileData = {
-      ...draft,
-      fullName: draft.fullName.trim(),
-      dateOfBirth: draft.dateOfBirth.trim(),
-      gender: draft.gender.trim(),
-      bloodGroup: draft.bloodGroup.trim(),
-      mobile: draft.mobile.trim(),
-      email: draft.email.trim(),
-      location: draft.location.trim(),
-      emergencyContactName:
-        draft.emergencyContactName.trim(),
-      emergencyContactPhone:
-        draft.emergencyContactPhone.trim(),
-    };
-
-    saveProfile(cleanedProfile);
-    setProfile(cleanedProfile);
-    setDraft(cleanedProfile);
+    saveProfile(draft);
+    setProfile(draft);
     setEditing(false);
+    setSaved(true);
 
     addAuditEvent({
-      type: "profile_updated",
-      title: "Patient profile updated",
-      actor: "You",
-      scope: "Patient identity and profile",
-      purpose: "Keep patient information current",
-      timestamp: "Just now",
-      status: "success",
-    });
+  type: "profile_updated",
+  title: "Patient profile updated",
+  actor: "You",
+  scope: "Patient identity and profile",
+  purpose: "Keep patient information current",
+  timestamp: "Just now",
+  status: "success",
+});
 
-    setNotice("Your patient profile has been updated.");
+
+
+    window.setTimeout(() => {
+      setSaved(false);
+    }, 2500);
   };
 
   const updateDraft = (
@@ -253,123 +236,80 @@ export default function PatientProfile({
   };
 
   return (
-    <div className="mx-auto max-w-[1450px]">
-      {/* =====================================================
-          HEADER
-          ===================================================== */}
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-              <UserRound size={14} />
-            </span>
-
-            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-600">
-              Patient Identity
-            </span>
-          </div>
-
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-            Patient Profile
-          </h1>
-
-          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-slate-500">
-            Your identity, contact information and essential
-            patient details — securely organized in one place.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleEdit}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-[11px] font-black text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-800"
-        >
-          <Edit3 size={14} />
-          Edit Profile
-        </button>
-      </div>
-
-      {/* =====================================================
-          IDENTITY HERO
-          ===================================================== */}
-      <section className="overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-card">
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 px-5 py-6 sm:px-7">
-          <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-cyan-300/10 blur-3xl" />
-
-          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="hp-page-enter mx-auto w-full max-w-6xl space-y-6">
+      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+        <div className="bg-gradient-to-r from-blue-50 via-white to-cyan-50 px-6 py-7 md:px-8">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-lg font-black text-white ring-1 ring-white/20 backdrop-blur">
-                {getInitials(profile.fullName)}
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 text-xl font-black text-white shadow-lg shadow-blue-500/20">
+                {initials}
               </div>
 
               <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-black text-white">
-                    {profile.fullName}
-                  </h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-500">
+                  Patient profile
+                </p>
 
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-white backdrop-blur">
-                    <ShieldCheck size={10} />
-                    Verified
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                  {profile.fullName}
+                </h1>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  HealthPassport ID:{" "}
+                  <span className="font-semibold text-slate-700">
+                    {profile.healthPassportId}
                   </span>
-                </div>
-
-                <p className="mt-1 text-[10px] font-medium text-blue-100">
-                  HealthPassport ID
-                </p>
-
-                <p className="mt-0.5 font-mono text-[11px] font-bold tracking-wide text-white">
-                  {profile.healthPassportId}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-              <p className="text-[8px] font-black uppercase tracking-[0.15em] text-blue-100">
-                Identity status
-              </p>
+            {!editing ? (
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              >
+                <Edit3 size={15} />
+                Edit Profile
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  <X size={15} />
+                  Cancel
+                </button>
 
-              <div className="mt-1 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.8)]" />
-
-                <span className="text-[11px] font-black text-white">
-                  Identity verified
-                </span>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  <Check size={15} />
+                  Save Changes
+                </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* ===================================================
-            PROFILE BODY
-            =================================================== */}
-        <div className="grid gap-5 p-5 lg:grid-cols-[1fr_280px] lg:p-7">
-          <div>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-[13px] font-black text-slate-900">
-                  Personal information
-                </h3>
+        {saved && (
+          <div className="flex items-center gap-2 border-t border-emerald-100 bg-emerald-50 px-6 py-3 text-xs font-semibold text-emerald-700 md:px-8">
+            <Check size={15} />
+            Profile changes saved successfully.
+          </div>
+        )}
 
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  Core identity information associated with your
-                  HealthPassport.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
+        <div className="p-6 md:p-8">
+          {!editing ? (
+            <div className="grid gap-3 md:grid-cols-2">
               <ProfileField
-                label="Full name"
-                value={profile.fullName}
-                icon={UserRound}
-              />
-
-              <ProfileField
-                label="Date of birth"
+                label="Date of Birth"
                 value={profile.dateOfBirth}
-                icon={Activity}
+                icon={UserRound}
               />
 
               <ProfileField
@@ -379,24 +319,11 @@ export default function PatientProfile({
               />
 
               <ProfileField
-                label="Blood group"
+                label="Blood Group"
                 value={profile.bloodGroup}
                 icon={Heart}
               />
-            </div>
 
-            <div className="mb-4 mt-7">
-              <h3 className="text-[13px] font-black text-slate-900">
-                Contact information
-              </h3>
-
-              <p className="mt-0.5 text-[10px] text-slate-400">
-                How healthcare providers and trusted contacts can
-                reach you.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
               <ProfileField
                 label="Mobile"
                 value={profile.mobile}
@@ -415,380 +342,157 @@ export default function PatientProfile({
                 icon={MapPin}
               />
             </div>
-
-            <div className="mb-4 mt-7">
-              <h3 className="text-[13px] font-black text-slate-900">
-                Emergency contact
-              </h3>
-
-              <p className="mt-0.5 text-[10px] text-slate-400">
-                The person to contact when urgent assistance is
-                required.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ProfileField
-                label="Contact name"
-                value={profile.emergencyContactName}
-                icon={AlertCircle}
-              />
-
-              <ProfileField
-                label="Contact phone"
-                value={profile.emergencyContactPhone}
-                icon={Phone}
-              />
-            </div>
-          </div>
-
-          {/* =================================================
-              PROFILE COMPLETENESS
-              ================================================= */}
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-cyan-50 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-500">
-                    Profile completeness
-                  </p>
-
-                  <p className="mt-2 text-3xl font-black tracking-tight text-blue-950">
-                    {completeness}%
-                  </p>
-                </div>
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
-                  <Check size={18} strokeWidth={2.5} />
-                </div>
-              </div>
-
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all"
-                  style={{ width: `${completeness}%` }}
-                />
-              </div>
-
-              <p className="mt-3 text-[10px] leading-4 text-blue-700/70">
-                A complete profile helps make your HealthPassport
-                more useful during care and emergencies.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <ShieldCheck size={17} />
-                </div>
-
-                <div>
-                  <p className="text-[11px] font-black text-slate-800">
-                    Identity protected
-                  </p>
-
-                  <p className="mt-1 text-[9px] leading-4 text-slate-400">
-                    Your identity details are controlled by you.
-                    Profile changes are recorded in your privacy
-                    audit history.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                Quick access
-              </p>
-
-              <div className="mt-3 grid gap-2">
-                <button
-                  type="button"
-                  onClick={() => onNavigate?.("records")}
-                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2.5 text-left text-[10px] font-bold text-slate-700 shadow-sm transition hover:bg-blue-50 hover:text-blue-700"
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {[
+                {
+                  label: "Full Name",
+                  field: "fullName" as const,
+                },
+                {
+                  label: "Date of Birth",
+                  field: "dateOfBirth" as const,
+                },
+                {
+                  label: "Gender",
+                  field: "gender" as const,
+                },
+                {
+                  label: "Blood Group",
+                  field: "bloodGroup" as const,
+                },
+                {
+                  label: "Mobile",
+                  field: "mobile" as const,
+                },
+                {
+                  label: "Email",
+                  field: "email" as const,
+                },
+                {
+                  label: "Location",
+                  field: "location" as const,
+                },
+              ].map((item) => (
+                <label
+                  key={item.field}
+                  className="block"
                 >
-                  Medical Records
-                  <span>→</span>
-                </button>
+                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                    {item.label}
+                  </span>
 
-                <button
-                  type="button"
-                  onClick={() => onNavigate?.("timeline")}
-                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2.5 text-left text-[10px] font-bold text-slate-700 shadow-sm transition hover:bg-blue-50 hover:text-blue-700"
-                >
-                  Health Timeline
-                  <span>→</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onNavigate?.("emergency")}
-                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2.5 text-left text-[10px] font-bold text-slate-700 shadow-sm transition hover:bg-blue-50 hover:text-blue-700"
-                >
-                  Emergency Passport
-                  <span>→</span>
-                </button>
-              </div>
+                  <input
+                    value={draft[item.field]}
+                    onChange={(event) =>
+                      updateDraft(
+                        item.field,
+                        event.target.value,
+                      )
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                  />
+                </label>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </section>
 
-      {/* =====================================================
-          SUCCESS NOTICE
-          ===================================================== */}
-      {notice && (
-        <div className="fixed bottom-5 right-5 z-[80] flex max-w-[360px] items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-2xl">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-            <Check size={15} strokeWidth={2.5} />
-          </div>
-
-          <p className="text-[11px] font-bold text-slate-700">
-            {notice}
-          </p>
-        </div>
-      )}
-
-      {/* =====================================================
-          EDIT MODAL
-          ===================================================== */}
-      {editing && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/20 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-500">
-                  Patient Identity
-                </p>
-
-                <h2 className="mt-1 text-lg font-black text-slate-900">
-                  Edit profile
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Close"
-              >
-                <X size={17} />
-              </button>
+      <section className="grid gap-5 md:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-500">
+              <ShieldCheck size={18} />
             </div>
 
-            <div className="max-h-[65vh] overflow-y-auto p-5 sm:p-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Full name
-                  </span>
+            <div>
+              <p className="text-sm font-bold text-slate-800">
+                Emergency information
+              </p>
 
-                  <input
-                    value={draft.fullName}
-                    onChange={(event) =>
-                      updateDraft(
-                        "fullName",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Date of birth
-                  </span>
-
-                  <input
-                    value={draft.dateOfBirth}
-                    onChange={(event) =>
-                      updateDraft(
-                        "dateOfBirth",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Gender
-                  </span>
-
-                  <select
-                    value={draft.gender}
-                    onChange={(event) =>
-                      updateDraft(
-                        "gender",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  >
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
-                    <option>Prefer not to say</option>
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Blood group
-                  </span>
-
-                  <select
-                    value={draft.bloodGroup}
-                    onChange={(event) =>
-                      updateDraft(
-                        "bloodGroup",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  >
-                    {[
-                      "A+",
-                      "A-",
-                      "B+",
-                      "B-",
-                      "AB+",
-                      "AB-",
-                      "O+",
-                      "O-",
-                      "Unknown",
-                    ].map((group) => (
-                      <option key={group}>{group}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Mobile
-                  </span>
-
-                  <input
-                    value={draft.mobile}
-                    onChange={(event) =>
-                      updateDraft(
-                        "mobile",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Email
-                  </span>
-
-                  <input
-                    type="email"
-                    value={draft.email}
-                    onChange={(event) =>
-                      updateDraft(
-                        "email",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-
-                <label className="block sm:col-span-2">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Location
-                  </span>
-
-                  <input
-                    value={draft.location}
-                    onChange={(event) =>
-                      updateDraft(
-                        "location",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Emergency contact
-                  </span>
-
-                  <input
-                    value={draft.emergencyContactName}
-                    onChange={(event) =>
-                      updateDraft(
-                        "emergencyContactName",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    Emergency phone
-                  </span>
-
-                  <input
-                    value={draft.emergencyContactPhone}
-                    onChange={(event) =>
-                      updateDraft(
-                        "emergencyContactPhone",
-                        event.target.value,
-                      )
-                    }
-                    className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-                <div className="flex gap-3">
-                  <ShieldCheck
-                    size={16}
-                    className="mt-0.5 shrink-0 text-blue-600"
-                  />
-
-                  <p className="text-[10px] leading-4 text-blue-800">
-                    Your HealthPassport ID is a permanent identity
-                    identifier and cannot be changed from this
-                    demo profile editor.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="h-10 rounded-xl px-4 text-[10px] font-black text-slate-500 transition hover:bg-white hover:text-slate-800"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-5 text-[10px] font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
-              >
-                <Check size={14} />
-                Save Changes
-              </button>
+              <p className="text-xs text-slate-400">
+                Protected patient-controlled information
+              </p>
             </div>
           </div>
+
+          <div className="mt-4 rounded-xl bg-slate-50 p-4">
+            <p className="text-xs text-slate-400">
+              Emergency contact
+            </p>
+
+            <p className="mt-1 text-sm font-bold text-slate-800">
+              {profile.emergencyContactName}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowEmergencyInfo(
+                  (current) => !current,
+                )
+              }
+              className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-700"
+            >
+              {showEmergencyInfo
+                ? "Hide protected contact details"
+                : "Show protected contact details"}
+            </button>
+
+            {showEmergencyInfo && (
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs text-amber-800">
+                <AlertCircle
+                  size={15}
+                  className="shrink-0"
+                />
+                {profile.emergencyContactPhone}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+              <Activity size={18} />
+            </div>
+
+            <div>
+              <p className="text-sm font-bold text-blue-900">
+                Your profile controls your health identity
+              </p>
+
+              <p className="mt-1 text-xs text-blue-700">
+                Emergency and sharing experiences use the
+                profile information configured here.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                onNavigate?.("emergency")
+              }
+              className="rounded-xl bg-white px-3.5 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100"
+            >
+              Emergency Passport
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                onNavigate?.("sharing")
+              }
+              className="rounded-xl bg-white px-3.5 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100"
+            >
+              Sharing & Consent
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

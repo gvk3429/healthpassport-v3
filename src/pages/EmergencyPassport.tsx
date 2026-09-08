@@ -1,1098 +1,953 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
+import type { Page } from "../components/AppSidebar";
+import {
+  allergies as demoAllergies,
+  conditions as demoConditions,
+  medications as demoMedications,
+  patient as demoPatient,
+} from "../data/mockHealthData";
 import {
   AlertTriangle,
+  Ambulance,
+  ArrowRight,
   Check,
-  ChevronRight,
+  CheckCircle2,
+  Clock3,
   Copy,
+  Eye,
   HeartPulse,
-  History,
   Info,
-  Lock,
+  LockKeyhole,
+  MapPin,
+  MessageCircle,
   Phone,
   QrCode,
-  ScanLine,
+  RefreshCw,
+  Shield,
   ShieldCheck,
   Smartphone,
   UserRound,
   X,
 } from "lucide-react";
 
-import type { Page } from "../components/AppSidebar";
-import { patient } from "../data/mockHealthData";
-import {
-  addAuditEvent,
-  getPrivacyState,
-  type PrivacyState,
-} from "../lib/privacyAudit";
-
 interface EmergencyPassportProps {
   onNavigate: (page: Page) => void;
 }
 
-interface EmergencyField {
-  id: string;
+type DemoStep =
+  | "passport"
+  | "scanned"
+  | "location"
+  | "contact"
+  | "protected"
+  | "otp"
+  | "unlocked";
+
+interface EmergencyItem {
   label: string;
   value: string;
-  enabled: boolean;
+  critical?: boolean;
 }
 
-interface EmergencyContact {
-  name: string;
-  relationship: string;
-  phone: string;
-  priority: string;
+const patient = {
+  name: demoPatient.name,
+  age: `${demoPatient.age} years`,
+  bloodGroup: demoPatient.bloodGroup,
+  allergy: demoAllergies[0]?.name ?? "Penicillin",
+  condition: demoConditions[0]?.name ?? "Type 2 Diabetes",
+  medication: demoMedications[0]
+    ? `${demoMedications[0].name} ${demoMedications[0].dosage}`
+    : "Metformin 500 mg",
+  instruction:
+    "Keep prescribed medication accessible. Follow your emergency care plan.",
+  contactName: "Emergency contact",
+  contactRelationship: "Protected contact",
+};
+
+const permittedInformation: EmergencyItem[] = [
+  {
+    label: "Blood group",
+    value: patient.bloodGroup,
+    critical: true,
+  },
+  {
+    label: "Critical allergy",
+    value: patient.allergy,
+    critical: true,
+  },
+  {
+    label: "Medical condition",
+    value: patient.condition,
+    critical: true,
+  },
+  {
+    label: "Critical medication",
+    value: patient.medication,
+  },
+];
+
+const protectedRecords = [
+  {
+    title: "Latest laboratory report",
+    description: "Recent blood work and observations",
+  },
+  {
+    title: "Medication history",
+    description: "Current and historical prescriptions",
+  },
+  {
+    title: "Clinical documents",
+    description: "Hospital, consultation and diagnostic records",
+  },
+];
+
+const qrPattern = [
+  "111111101001101111111",
+  "100000100110101000001",
+  "101110101011101011101",
+  "101110100101001011101",
+  "101110101111101011101",
+  "100000101010101000001",
+  "111111101010101111111",
+  "000000001101100000000",
+  "110101111011011010111",
+  "001110010110101100100",
+  "111001101011110011011",
+  "010110010101001110100",
+  "101101111010111001101",
+  "000000001011001010010",
+  "111111101101111010101",
+  "100000101011001101110",
+  "101110100110111001001",
+  "101110101001010111010",
+  "101110101110101001101",
+  "100000101001011110010",
+  "111111101110100101101",
+];
+
+function getStepLabel(step: DemoStep) {
+  switch (step) {
+    case "passport":
+      return "Emergency Passport";
+    case "scanned":
+      return "QR scanned";
+    case "location":
+      return "Location shared";
+    case "contact":
+      return "Contact notified";
+    case "protected":
+      return "Protected access requested";
+    case "otp":
+      return "Consent verification";
+    case "unlocked":
+      return "Protected records unlocked";
+    default:
+      return "Emergency Passport";
+  }
 }
 
-function cn(...classes: Array<string | false | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function Modal({
-  open,
-  title,
-  description,
-  children,
-  onClose,
-}: {
-  open: boolean;
-  title: string;
-  description?: string;
-  children: ReactNode;
-  onClose: () => void;
-}) {
-  if (!open) return null;
-
+function QRVisual() {
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
-          <div className="min-w-0 pr-4">
-            <h2 className="text-lg font-semibold text-slate-900">
-              {title}
-            </h2>
+    <div className="relative flex aspect-square w-full max-w-[260px] items-center justify-center rounded-[28px] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.12)]">
+      <div
+        className="grid aspect-square w-full gap-[2px]"
+        style={{
+          gridTemplateColumns: "repeat(21, minmax(0, 1fr))",
+          gridTemplateRows: "repeat(21, minmax(0, 1fr))",
+        }}
+        aria-label="HealthPassport Emergency QR"
+      >
+        {qrPattern.flatMap((row, rowIndex) =>
+          row.split("").map((cell, columnIndex) => (
+            <span
+              key={`${rowIndex}-${columnIndex}`}
+              className={`aspect-square rounded-[1px] ${
+                cell === "1" ? "bg-slate-950" : "bg-white"
+              }`}
+            />
+          )),
+        )}
+      </div>
 
-            {description ? (
-              <p className="mt-1 text-sm leading-5 text-slate-500">
-                {description}
-              </p>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="max-h-[78vh] overflow-y-auto p-6">
-          {children}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border-4 border-white bg-slate-950 text-white shadow-lg">
+          <HeartPulse size={22} strokeWidth={2.2} />
         </div>
       </div>
     </div>
   );
 }
 
-/*
- * Deterministic QR-style visual for the investor demo.
- *
- * This is intentionally a visual/demo QR pattern and is NOT intended
- * to be a production-scannable QR code.
- *
- * The actual emergency scan interaction is simulated through the
- * "Simulate emergency scan" action below.
- */
-function QrPattern({ compact = false }: { compact?: boolean }) {
-  const size = 21;
-
-  const cells = Array.from({
-    length: size * size,
-  });
-
-  const finderZones = [
-    { top: 0, left: 0 },
-    { top: 0, left: size - 7 },
-    { top: size - 7, left: 0 },
-  ];
-
-  const isInsideFinder = (row: number, col: number) => {
-    return finderZones.some(({ top, left }) => {
-      return (
-        row >= top &&
-        row < top + 7 &&
-        col >= left &&
-        col < left + 7
-      );
-    });
-  };
-
-  const getFinderValue = (row: number, col: number) => {
-    for (const { top, left } of finderZones) {
-      if (
-        row >= top &&
-        row < top + 7 &&
-        col >= left &&
-        col < left + 7
-      ) {
-        const r = row - top;
-        const c = col - left;
-
-        return (
-          r === 0 ||
-          r === 6 ||
-          c === 0 ||
-          c === 6 ||
-          (r >= 2 &&
-            r <= 4 &&
-            c >= 2 &&
-            c <= 4)
-        );
-      }
-    }
-
-    return false;
-  };
-
+function StatusBadge({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div
-      className={cn(
-        "grid rounded-lg bg-white",
-        compact ? "gap-[1px] p-2" : "gap-[1px] p-3"
-      )}
-      style={{
-        gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
-      }}
-      aria-label="Emergency QR demo pattern"
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        active
+          ? "bg-emerald-50 text-emerald-700"
+          : "bg-slate-100 text-slate-500"
+      }`}
     >
-      {cells.map((_, index) => {
-        const row = Math.floor(index / size);
-        const col = index % size;
-
-        const finder = isInsideFinder(row, col);
-
-        const alignment =
-          row >= 14 &&
-          row <= 18 &&
-          col >= 14 &&
-          col <= 18 &&
-          (
-            row === 14 ||
-            row === 18 ||
-            col === 14 ||
-            col === 18 ||
-            (
-              row === 16 &&
-              col === 16
-            )
-          );
-
-        const timing =
-          (
-            row === 6 &&
-            col >= 8 &&
-            col <= 12
-          ) ||
-          (
-            col === 6 &&
-            row >= 8 &&
-            row <= 12
-          );
-
-        const data =
-          (
-            (
-              row * 13 +
-              col * 17 +
-              row * col * 3 +
-              7
-            ) %
-            11
-          ) < 5;
-
-        const filled = finder
-          ? getFinderValue(row, col)
-          : alignment || timing || data;
-
-        return (
-          <span
-            key={index}
-            aria-hidden="true"
-            className={cn(
-              "aspect-square w-full rounded-[1px]",
-              filled
-                ? "bg-slate-950"
-                : "bg-white"
-            )}
-          />
-        );
-      })}
-    </div>
+      {active ? <Check size={13} /> : <Clock3 size={13} />}
+      {children}
+    </span>
   );
 }
 
-const initialFields: EmergencyField[] = [
-  {
-    id: "name",
-    label: "Name",
-    value: patient.name,
-    enabled: true,
-  },
-  {
-    id: "age",
-    label: "Age",
-    value: `${patient.age} years`,
-    enabled: true,
-  },
-  {
-    id: "blood",
-    label: "Blood group",
-    value: patient.bloodGroup,
-    enabled: true,
-  },
-  {
-    id: "allergy",
-    label: "Allergies",
-    value: "Penicillin",
-    enabled: true,
-  },
-  {
-    id: "condition",
-    label: "Critical condition",
-    value: "Type 2 diabetes",
-    enabled: true,
-  },
-  {
-    id: "medication",
-    label: "Critical medication",
-    value: "Metformin 500 mg",
-    enabled: false,
-  },
-  {
-    id: "instructions",
-    label: "Important instructions",
-    value:
-      "Check blood glucose before administering medication.",
-    enabled: true,
-  },
-];
+function EmergencyInfoCard({ item }: { item: EmergencyItem }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+            {item.label}
+          </p>
 
-const contacts: EmergencyContact[] = [
-  {
-    name: "Priya Rao",
-    relationship: "Spouse",
-    phone: "+91 98765 43210",
-    priority: "Primary",
-  },
-  {
-    name: "Rahul Rao",
-    relationship: "Brother",
-    phone: "+91 99887 66554",
-    priority: "Secondary",
-  },
-];
+          <p className="mt-1.5 text-sm font-semibold text-slate-800">
+            {item.value}
+          </p>
+        </div>
+
+        {item.critical && (
+          <span className="rounded-full bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-600">
+            Critical
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function EmergencyPassport({
   onNavigate,
 }: EmergencyPassportProps) {
-  const [fields, setFields] =
-    useState<EmergencyField[]>(initialFields);
+  const [step, setStep] = useState<DemoStep>("passport");
+  const [locationShared, setLocationShared] = useState(false);
+  const [contactNotified, setContactNotified] = useState(false);
+  const [accessRequested, setAccessRequested] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showScanPreview, setShowScanPreview] = useState(false);
 
-  const [qrEnabled, setQrEnabled] =
-    useState(true);
+  const progress = useMemo(() => {
+    switch (step) {
+      case "scanned":
+        return 25;
 
-  const [showQr, setShowQr] =
-    useState(false);
+      case "location":
+        return 50;
 
-  const [previewOpen, setPreviewOpen] =
-    useState(false);
+      case "contact":
+      case "protected":
+      case "otp":
+        return 75;
 
-  const [scanOpen, setScanOpen] =
-    useState(false);
+      case "unlocked":
+        return 100;
 
-  const [privacy, setPrivacy] =
-    useState<PrivacyState>(() =>
-      getPrivacyState()
-    );
+      case "passport":
+      default:
+        return 0;
+    }
+  }, [step]);
 
-  const [notice, setNotice] =
-    useState<string | null>(null);
-
-  useEffect(() => {
-    const refresh = () => {
-      setPrivacy(getPrivacyState());
-    };
-
-    window.addEventListener(
-      "healthpassport-privacy-updated",
-      refresh
-    );
-
-    return () => {
-      window.removeEventListener(
-        "healthpassport-privacy-updated",
-        refresh
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!notice) return;
-
-    const timer = window.setTimeout(() => {
-      setNotice(null);
-    }, 3500);
-
-    return () =>
-      window.clearTimeout(timer);
-  }, [notice]);
-
-  const enabledFields = useMemo(
-    () =>
-      fields.filter(
-        (field) => field.enabled
-      ),
-    [fields]
-  );
-
-  const qrAccessEvents = useMemo(
-    () =>
-      privacy.audit.filter(
-        (event) =>
-          event.type === "qr_accessed"
-      ),
-    [privacy.audit]
-  );
-
-  const toggleField = (id: string) => {
-    setFields((current) =>
-      current.map((field) =>
-        field.id === id
-          ? {
-              ...field,
-              enabled: !field.enabled,
-            }
-          : field
-      )
-    );
+  const simulateScan = () => {
+    setShowScanPreview(false);
+    setStep("scanned");
   };
 
-  const showQrModal = () => {
-    if (!qrEnabled) {
-      setNotice(
-        "Enable Emergency QR before showing the emergency profile."
-      );
+  const shareLocation = () => {
+    setLocationShared(true);
+    setStep("location");
+  };
+
+  const notifyContact = () => {
+    setContactNotified(true);
+    setStep("contact");
+  };
+
+  const requestProtectedAccess = () => {
+    setAccessRequested(true);
+    setStep("protected");
+  };
+
+  const beginOtp = () => {
+    setOtp("");
+    setOtpError(false);
+    setStep("otp");
+  };
+
+  const verifyOtp = () => {
+    if (otp === "2048") {
+      setOtpError(false);
+      setStep("unlocked");
       return;
     }
 
-    setShowQr(true);
+    setOtpError(true);
   };
 
-  const simulateScan = () => {
-    if (!qrEnabled) return;
-
-    addAuditEvent({
-      type: "qr_accessed",
-      title: "Emergency QR accessed",
-      actor: "Emergency QR",
-      scope: "Emergency profile",
-      purpose: "Emergency access",
-      timestamp: "Just now",
-      status: "success",
-    });
-
-    setPrivacy(getPrivacyState());
-
-    setScanOpen(false);
-
-    setNotice(
-      "Emergency QR access recorded in the audit trail."
-    );
+  const resetDemo = () => {
+    setStep("passport");
+    setLocationShared(false);
+    setContactNotified(false);
+    setAccessRequested(false);
+    setOtp("");
+    setOtpError(false);
+    setCopied(false);
+    setShowScanPreview(false);
   };
 
-  const copyEmergencyLink = () => {
-    const link =
-      "https://healthpassport.demo/emergency/HP-7F29-A2";
+  const copyDemoLink = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        "https://demo.healthpassport.app/emergency/HP-2026-00128",
+      );
 
-    navigator.clipboard
-      ?.writeText(link)
-      .catch(() => undefined);
+      setCopied(true);
 
-    setNotice("Emergency link copied.");
-  };
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 1600);
+    } catch {
+      setCopied(true);
 
-  const callContact = (
-    contact: EmergencyContact
-  ) => {
-    addAuditEvent({
-      type: "qr_accessed",
-      title: `Emergency contact action: ${contact.name}`,
-      actor: "Emergency profile",
-      scope: "Emergency contact",
-      purpose: "Emergency contact action",
-      timestamp: "Just now",
-      status: "info",
-    });
-
-    setPrivacy(getPrivacyState());
-
-    setNotice(
-      `Calling ${contact.name} in the demo.`
-    );
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 1600);
+    }
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
-      {notice ? (
-        <div className="fixed right-5 top-5 z-[120] flex max-w-sm items-start gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-3 shadow-xl">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-            <Check size={15} />
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-rose-500">
+            <ShieldCheck size={15} />
+            Emergency response
           </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-900">
-              Emergency Passport
-            </p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Emergency Passport
+          </h1>
 
-            <p className="mt-0.5 text-xs leading-5 text-slate-500">
-              {notice}
-            </p>
-          </div>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+            Critical information when it matters most — with protected health
+            records kept behind explicit consent.
+          </p>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setNotice(null)}
-            aria-label="Dismiss notification"
-            className="text-slate-400 hover:text-slate-700"
+            onClick={resetDemo}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
           >
-            <X size={15} />
+            <RefreshCw size={15} />
+            Reset demo
           </button>
-        </div>
-      ) : null}
-
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <section className="relative mb-7 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-          <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-rose-100/60 blur-3xl" />
-
-          <div className="absolute bottom-0 left-1/3 h-32 w-48 rounded-full bg-indigo-100/50 blur-3xl" />
-
-          <div className="relative p-6 sm:p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-2xl">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-200">
-                    <HeartPulse size={22} />
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-rose-500">
-                      Emergency Passport
-                    </p>
-
-                    <p className="text-xs text-slate-500">
-                      Emergency access, without full record access
-                    </p>
-                  </div>
-                </div>
-
-                <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-                  The right information
-                  <br />
-                  <span className="text-rose-600">
-                    when it matters.
-                  </span>
-                </h1>
-
-                <p className="mt-4 max-w-xl text-sm leading-6 text-slate-500 sm:text-base">
-                  Your Emergency QR provides only the information you explicitly
-                  permit. It does not expose your complete private HealthPassport.
-                </p>
-              </div>
-
-              <div
-                className={cn(
-                  "min-w-[230px] rounded-2xl border p-4",
-                  qrEnabled
-                    ? "border-emerald-200 bg-emerald-50"
-                    : "border-slate-200 bg-slate-50"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm",
-                      qrEnabled
-                        ? "text-emerald-600"
-                        : "text-slate-400"
-                    )}
-                  >
-                    <QrCode size={19} />
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-500">
-                      Emergency QR
-                    </p>
-
-                    <p
-                      className={cn(
-                        "text-base font-bold",
-                        qrEnabled
-                          ? "text-emerald-700"
-                          : "text-slate-600"
-                      )}
-                    >
-                      {qrEnabled
-                        ? "Enabled"
-                        : "Disabled"}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setQrEnabled(
-                      (current) => !current
-                    )
-                  }
-                  className={cn(
-                    "mt-4 w-full rounded-xl py-2 text-xs font-semibold transition",
-                    qrEnabled
-                      ? "bg-white text-rose-600 hover:bg-rose-50"
-                      : "bg-slate-900 text-white hover:bg-slate-800"
-                  )}
-                >
-                  {qrEnabled
-                    ? "Disable QR"
-                    : "Enable QR"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-6">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-500">
-                Emergency information
-              </p>
-
-              <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                Choose what your QR reveals
-              </h2>
-
-              <p className="mt-1 text-sm leading-5 text-slate-500">
-                Only enabled fields will appear to someone accessing the
-                Emergency Passport.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              {fields.map((field) => (
-                <div
-                  key={field.id}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-700">
-                      {field.label}
-                    </p>
-
-                    <p className="mt-0.5 truncate text-[11px] text-slate-400">
-                      {field.value}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      toggleField(field.id)
-                    }
-                    aria-label={`${field.enabled ? "Hide" : "Show"} ${field.label}`}
-                    aria-pressed={field.enabled}
-                    className={cn(
-                      "relative h-7 w-12 shrink-0 rounded-full transition",
-                      field.enabled
-                        ? "bg-emerald-600"
-                        : "bg-slate-300"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition",
-                        field.enabled
-                          ? "left-6"
-                          : "left-1"
-                      )}
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 flex gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-3">
-              <Lock
-                size={16}
-                className="mt-0.5 shrink-0 text-indigo-600"
-              />
-
-              <p className="text-[11px] leading-5 text-indigo-700">
-                Emergency access is intentionally separated from your private
-                medical records.
-              </p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-500">
-                Your emergency QR
-              </p>
-
-              <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                Ready when needed
-              </h2>
-            </div>
-
-            <div className="rounded-3xl bg-slate-950 p-6">
-              <div className="mx-auto max-w-[230px] rounded-2xl bg-white p-2">
-                <QrPattern />
-              </div>
-
-              <div className="mt-5 text-center">
-                <p className="text-sm font-semibold text-white">
-                  {patient.name}
-                </p>
-
-                <p className="mt-1 text-xs text-slate-400">
-                  Emergency HealthPassport · {patient.age} years
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={!qrEnabled}
-                onClick={showQrModal}
-                className={cn(
-                  "flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-semibold transition",
-                  qrEnabled
-                    ? "bg-rose-600 text-white hover:bg-rose-700"
-                    : "cursor-not-allowed bg-slate-100 text-slate-400"
-                )}
-              >
-                <QrCode size={15} />
-                Show QR
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPreviewOpen(true)
-                }
-                className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                <Smartphone size={15} />
-                Preview
-              </button>
-            </div>
-
-            <button
-              type="button"
-              disabled={!qrEnabled}
-              onClick={() =>
-                setScanOpen(true)
-              }
-              className={cn(
-                "mt-2 flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-xs font-semibold transition",
-                qrEnabled
-                  ? "border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-                  : "cursor-not-allowed border-slate-100 text-slate-300"
-              )}
-            >
-              <ScanLine size={15} />
-              Simulate emergency scan
-            </button>
-
-            <button
-              type="button"
-              onClick={copyEmergencyLink}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-semibold text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-            >
-              <Copy size={13} />
-              Copy emergency link
-            </button>
-          </section>
-        </div>
-
-        <section className="mt-8">
-          <div className="mb-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-500">
-              Emergency contacts
-            </p>
-
-            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-              People who can help
-            </h2>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {contacts.map((contact) => (
-              <div
-                key={contact.name}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-                      <UserRound size={19} />
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {contact.name}
-                      </p>
-
-                      <p className="text-xs text-slate-400">
-                        {contact.relationship} · {contact.priority}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      callContact(contact)
-                    }
-                    className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-                  >
-                    <Phone size={14} />
-                    Call
-                  </button>
-                </div>
-
-                <p className="mt-4 text-xs text-slate-500">
-                  {contact.phone}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-8">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-500">
-                Transparency
-              </p>
-
-              <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                Emergency access activity
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onNavigate("privacy")
-              }
-              className="flex items-center gap-1 self-start text-xs font-semibold text-indigo-600"
-            >
-              Full audit trail
-              <ChevronRight size={15} />
-            </button>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {qrAccessEvents.length === 0 ? (
-              <div className="p-8 text-center">
-                <History
-                  size={28}
-                  className="mx-auto text-slate-300"
-                />
-
-                <p className="mt-3 text-sm font-semibold text-slate-700">
-                  No emergency access yet
-                </p>
-
-                <p className="mt-1 text-xs text-slate-400">
-                  QR access events will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {qrAccessEvents
-                  .slice(0, 5)
-                  .map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center gap-4 p-4"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-                        <QrCode size={16} />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-800">
-                          {event.title}
-                        </p>
-
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          {event.actor} · {event.timestamp}
-                        </p>
-                      </div>
-
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-600">
-                        Recorded
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="mt-8">
-          <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-white p-5 sm:p-6">
-            <div className="flex flex-col gap-5 sm:flex-row">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                <AlertTriangle size={19} />
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Emergency access is not full medical access
-                </h3>
-
-                <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
-                  The Emergency Passport is intentionally limited to selected
-                  emergency information. A person accessing the QR does not
-                  receive your complete medical records, laboratory history,
-                  documents, or private HealthPassport information.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 text-[11px] text-slate-400">
-            <ShieldCheck size={14} />
-
-            <span>
-              Emergency profile is patient-controlled
-            </span>
-          </div>
 
           <button
             type="button"
-            onClick={() =>
-              onNavigate("privacy")
-            }
-            className="flex items-center gap-1 self-start text-[11px] font-semibold text-indigo-600"
+            onClick={() => onNavigate("sharing")}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
-            Review privacy controls
-            <ChevronRight size={14} />
+            Sharing & Consent
+            <ArrowRight size={15} />
           </button>
         </div>
       </div>
 
-      <Modal
-        open={showQr}
-        onClose={() => setShowQr(false)}
-        title="Emergency QR"
-        description="Only your selected emergency information is exposed."
-      >
-        <div className="rounded-3xl bg-slate-950 p-6">
-          <div className="mx-auto max-w-[270px] rounded-2xl bg-white p-3">
-            <QrPattern compact />
-          </div>
-
-          <div className="mt-5 text-center">
-            <p className="text-sm font-semibold text-white">
-              {patient.name} · Emergency Passport
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">
+              Emergency response demo
             </p>
 
-            <p className="mt-1 text-xs text-slate-400">
-              Emergency-only access · {patient.age} years
+            <p className="mt-0.5 text-xs text-slate-500">
+              {getStepLabel(step)}
             </p>
           </div>
-        </div>
 
-        <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-          <div className="flex gap-3">
-            <ShieldCheck
-              size={16}
-              className="mt-0.5 shrink-0 text-emerald-600"
-            />
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-28 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-rose-500 transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
 
-            <p className="text-[11px] leading-5 text-emerald-700">
-              This demo QR does not provide access to the full HealthPassport.
-            </p>
+            <span className="text-xs font-semibold text-slate-500">
+              {progress}%
+            </span>
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            onClick={() => setShowQr(false)}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            Done
-          </button>
+        <div className="grid grid-cols-2 gap-0 divide-x divide-slate-100 sm:grid-cols-4">
+          <div className="p-4">
+            <StatusBadge active={step !== "passport"}>
+              QR scanned
+            </StatusBadge>
+          </div>
+
+          <div className="p-4">
+            <StatusBadge active={locationShared}>
+              Location shared
+            </StatusBadge>
+          </div>
+
+          <div className="p-4">
+            <StatusBadge active={contactNotified}>
+              Contact notified
+            </StatusBadge>
+          </div>
+
+          <div className="p-4">
+            <StatusBadge active={step === "unlocked"}>
+              Records unlocked
+            </StatusBadge>
+          </div>
         </div>
-      </Modal>
+      </div>
 
-      <Modal
-        open={previewOpen}
-        onClose={() =>
-          setPreviewOpen(false)
-        }
-        title="Emergency view"
-        description="This is what an emergency-access visitor would see."
-      >
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          <div className="bg-rose-600 p-5 text-white">
-            <div className="flex items-center gap-3">
-              <HeartPulse size={22} />
-
-              <div>
-                <p className="text-sm font-bold">
-                  Emergency HealthPassport
-                </p>
-
-                <p className="text-[11px] text-rose-100">
-                  {patient.name}
-                </p>
+      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <section className="overflow-hidden rounded-[28px] border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-orange-50 shadow-sm">
+          <div className="flex items-start justify-between gap-4 p-6 sm:p-8">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm">
+                <QrCode size={14} />
+                Emergency QR
               </div>
+
+              <h2 className="mt-5 text-2xl font-bold text-slate-900">
+                Scan to access critical information
+              </h2>
+
+              <p className="mt-2 max-w-lg text-sm leading-6 text-slate-500">
+                A finder or clinician can see only the emergency information
+                permitted by the patient. Full medical records remain
+                protected.
+              </p>
+            </div>
+
+            <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-rose-500 shadow-sm sm:flex">
+              <Shield size={22} />
             </div>
           </div>
 
-          <div className="space-y-2 p-4">
-            {enabledFields.map((field) => (
-              <div
-                key={field.id}
-                className="rounded-xl bg-slate-50 p-3"
-              >
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                  {field.label}
-                </p>
+          <div className="grid gap-6 px-6 pb-6 sm:px-8 sm:pb-8 lg:grid-cols-[260px_1fr] lg:items-center">
+            <div className="flex justify-center">
+              <QRVisual />
+            </div>
 
-                <p className="mt-1 text-sm font-semibold text-slate-800">
-                  {field.value}
-                </p>
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white bg-white/80 p-5 shadow-sm backdrop-blur">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500">
+                    <UserRound size={18} />
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
+                      Patient
+                    </p>
+
+                    <p className="mt-1 text-lg font-bold text-slate-900">
+                      {patient.name}
+                    </p>
+
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {patient.age} · HealthPassport ID HP-2026-00128
+                    </p>
+                  </div>
+                </div>
               </div>
+
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <div className="flex gap-3">
+                  <ShieldCheck
+                    size={19}
+                    className="mt-0.5 shrink-0 text-emerald-600"
+                  />
+
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800">
+                      Privacy boundary active
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-emerald-700">
+                      Emergency QR does not expose the patient's full medical
+                      record.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {step === "passport" ? (
+                <button
+                  type="button"
+                  onClick={() => setShowScanPreview(true)}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition hover:bg-rose-600"
+                >
+                  <Smartphone size={17} />
+                  Simulate QR Scan
+                  <ArrowRight size={16} />
+                </button>
+              ) : (
+                <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 size={20} />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        QR successfully scanned
+                      </p>
+
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Emergency profile is available without exposing
+                        protected records.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">
+                QR-visible information
+              </p>
+
+              <h2 className="mt-2 text-xl font-bold text-slate-900">
+                Emergency profile
+              </h2>
+            </div>
+
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-500">
+              <HeartPulse size={20} />
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {permittedInformation.map((item) => (
+              <EmergencyInfoCard key={item.label} item={item} />
             ))}
           </div>
 
-          <div className="border-t border-slate-100 bg-slate-50 p-4">
-            <div className="flex gap-2">
-              <Info
-                size={15}
-                className="mt-0.5 shrink-0 text-indigo-500"
+          <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+            <div className="flex gap-3">
+              <AlertTriangle
+                size={18}
+                className="mt-0.5 shrink-0 text-amber-600"
               />
 
-              <p className="text-[11px] leading-5 text-slate-500">
-                Private medical records remain protected.
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  Important instruction
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-amber-700">
+                  {patient.instruction}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center gap-2 text-xs text-slate-400">
+            <LockKeyhole size={14} />
+            Only explicitly permitted emergency data is shown.
+          </div>
+        </section>
+      </div>
+
+      {step !== "passport" && (
+        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">
+                Emergency response
+              </p>
+
+              <h2 className="mt-2 text-xl font-bold text-slate-900">
+                Act without exposing private records
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                The responder can coordinate help while protected data remains
+                behind patient consent.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={shareLocation}
+                disabled={locationShared}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                  locationShared
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-900 text-white hover:bg-slate-800"
+                }`}
+              >
+                {locationShared ? (
+                  <CheckCircle2 size={16} />
+                ) : (
+                  <MapPin size={16} />
+                )}
+
+                {locationShared ? "Location Shared" : "Share Location"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("contact");
+                  setContactNotified(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600"
+              >
+                <Ambulance size={16} />
+                Call Ambulance
+              </button>
+
+              <button
+                type="button"
+                onClick={notifyContact}
+                disabled={contactNotified}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                  contactNotified
+                    ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {contactNotified ? (
+                  <Check size={16} />
+                ) : (
+                  <MessageCircle size={16} />
+                )}
+
+                {contactNotified
+                  ? "Contact Notified"
+                  : "Notify Emergency Contact"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 border-t border-slate-100 pt-6 md:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <MapPin size={18} className="text-slate-500" />
+
+              <p className="mt-3 text-sm font-semibold text-slate-800">
+                Location
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                {locationShared
+                  ? "Current location shared with emergency responders."
+                  : "Not shared yet."}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <Phone size={18} className="text-slate-500" />
+
+              <p className="mt-3 text-sm font-semibold text-slate-800">
+                Emergency contact
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                {contactNotified
+                  ? `${patient.contactName} notified securely. Phone number hidden.`
+                  : `${patient.contactName} · ${patient.contactRelationship}`}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <Ambulance size={18} className="text-slate-500" />
+
+              <p className="mt-3 text-sm font-semibold text-slate-800">
+                Ambulance
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Demo action represents the emergency-call workflow.
               </p>
             </div>
           </div>
-        </div>
+        </section>
+      )}
 
-        <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={() =>
-              setPreviewOpen(false)
-            }
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            Close preview
-          </button>
-        </div>
-      </Modal>
+      {step !== "passport" && (
+        <section className="rounded-[28px] border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 shadow-sm">
+                <LockKeyhole size={14} />
+                Protected medical records
+              </div>
 
-      <Modal
-        open={scanOpen}
-        onClose={() => setScanOpen(false)}
-        title="Simulate emergency scan"
-        description="This demonstrates the emergency access flow."
-      >
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
+              <h2 className="mt-4 text-xl font-bold text-slate-900">
+                Need more clinical information?
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                The emergency QR intentionally stops at critical information.
+                A responder can request protected records, but access requires
+                explicit patient consent and verification.
+              </p>
+
+              {step === "protected" ||
+              step === "otp" ||
+              step === "unlocked" ? (
+                <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-indigo-600">
+                  <CheckCircle2 size={15} />
+                  Protected access request created
+                </div>
+              ) : null}
+            </div>
+
+            <div className="w-full max-w-sm">
+              {step === "unlocked" ? (
+                <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                      <CheckCircle2 size={20} />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Access approved
+                      </p>
+
+                      <p className="text-xs text-slate-500">
+                        Protected records are temporarily available.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {protectedRecords.map((record) => (
+                      <div
+                        key={record.title}
+                        className="rounded-xl bg-slate-50 p-3"
+                      >
+                        <p className="text-sm font-semibold text-slate-800">
+                          {record.title}
+                        </p>
+
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {record.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("records")}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
+                    View Medical Records
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              ) : step === "otp" ? (
+                <div className="rounded-2xl border border-white bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Verify patient consent
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Enter the demo OTP sent to the patient's verified
+                        contact.
+                      </p>
+                    </div>
+
+                    <LockKeyhole size={18} className="text-indigo-500" />
+                  </div>
+
+                  <input
+                    value={otp}
+                    onChange={(event) => {
+                      setOtp(
+                        event.target.value.replace(/\D/g, "").slice(0, 4),
+                      );
+                      setOtpError(false);
+                    }}
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="Enter 4-digit OTP"
+                    className={`mt-4 w-full rounded-xl border bg-white px-4 py-3 text-center text-lg font-bold tracking-[0.35em] text-slate-800 outline-none transition focus:ring-2 ${
+                      otpError
+                        ? "border-rose-300 focus:ring-rose-100"
+                        : "border-slate-200 focus:border-indigo-300 focus:ring-indigo-100"
+                    }`}
+                  />
+
+                  {otpError && (
+                    <p className="mt-2 text-center text-xs font-semibold text-rose-600">
+                      Demo OTP is 2048.
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={verifyOtp}
+                    disabled={otp.length !== 4}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ShieldCheck size={16} />
+                    Verify & Unlock
+                  </button>
+
+                  <p className="mt-3 text-center text-[11px] text-slate-400">
+                    Demo only · no real patient data is being transmitted.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-white bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                      <LockKeyhole size={18} />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Protected records are locked
+                      </p>
+
+                      <p className="text-xs text-slate-500">
+                        Consent is required before access.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      accessRequested ? beginOtp : requestProtectedAccess
+                    }
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                  >
+                    {accessRequested ? (
+                      <>
+                        Verify Patient Consent
+                        <ArrowRight size={15} />
+                      </>
+                    ) : (
+                      <>
+                        Request Protected Access
+                        <Eye size={15} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600">
-              <ScanLine size={19} />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+              <Info size={18} />
             </div>
 
             <div>
-              <p className="text-sm font-semibold text-indigo-900">
-                QR scan detected
+              <p className="text-sm font-semibold text-slate-800">
+                Demo privacy boundary
               </p>
 
-              <p className="mt-1 text-xs leading-5 text-indigo-700">
-                The visitor will receive the Emergency Passport containing
-                only your explicitly permitted fields.
+              <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
+                Emergency access is intentionally layered: critical
+                information first, protected medical records only after
+                explicit consent. This prototype simulates the workflow
+                entirely in the frontend.
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={copyDemoLink}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? "Copied" : "Copy demo link"}
+          </button>
         </div>
+      </section>
 
-        <div className="mt-5 space-y-2">
-          {enabledFields
-            .slice(0, 5)
-            .map((field) => (
-              <div
-                key={field.id}
-                className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 p-3"
-              >
-                <span className="text-xs text-slate-500">
-                  {field.label}
-                </span>
+      {showScanPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-rose-500">
+                  QR scanner
+                </p>
 
-                <span className="text-right text-xs font-semibold text-slate-700">
-                  {field.value}
-                </span>
+                <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                  Emergency QR detected
+                </h2>
               </div>
-            ))}
-        </div>
 
-        <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-          <p className="text-[11px] leading-5 text-emerald-700">
-            The scan will be recorded in your Privacy & Access audit trail.
-          </p>
-        </div>
+              <button
+                type="button"
+                onClick={() => setShowScanPreview(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200"
+                aria-label="Close QR scanner"
+              >
+                <X size={17} />
+              </button>
+            </div>
 
-        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={() =>
-              setScanOpen(false)
-            }
-            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
+            <div className="mt-6 flex justify-center">
+              <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 p-5">
+                <QRVisual />
 
-          <button
-            type="button"
-            onClick={simulateScan}
-            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-          >
-            <ScanLine size={16} />
-            Simulate scan
-          </button>
+                <div className="absolute left-5 right-5 top-1/2 h-0.5 bg-rose-400 shadow-[0_0_14px_rgba(251,113,133,0.9)]" />
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-center">
+              <p className="text-sm font-semibold text-emerald-800">
+                HealthPassport QR verified
+              </p>
+
+              <p className="mt-1 text-xs text-emerald-700">
+                Limited emergency information can now be viewed.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={simulateScan}
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-600"
+            >
+              Open Emergency Profile
+              <ArrowRight size={16} />
+            </button>
+          </div>
         </div>
-      </Modal>
+      )}
     </div>
   );
 }

@@ -21,11 +21,16 @@ import Integrations from "./pages/Integrations";
 import PatientProfile from "./pages/PatientProfile";
 import PatientHealthSummary from "./pages/PatientHealthSummary";
 import Settings from "./pages/Settings";
+import SymptomsAnalyzer from "./pages/SymptomsAnalyzer";
+import DiseasePrediction from "./pages/DiseasePrediction";
 
 import LandingPage from "./pages/LandingPage";
 import DemoLogin from "./pages/DemoLogin";
 
-type EntryScreen = "landing" | "login" | "app";
+type EntryScreen =
+  | "landing"
+  | "login"
+  | "app";
 
 function PlaceholderPage({
   title,
@@ -176,6 +181,20 @@ function App() {
           />
         );
 
+      case "symptoms":
+        return (
+          <SymptomsAnalyzer
+            onNavigate={handleNavigate}
+          />
+        );
+
+      case "prediction":
+        return (
+          <DiseasePrediction
+            onNavigate={handleNavigate}
+          />
+        );
+
       case "privacy":
         return (
           <PrivacyAccess
@@ -200,9 +219,7 @@ function App() {
       case "profile":
         return (
           <PatientProfile
-            onNavigate={(page) => {
-              handleNavigate(page as Page);
-            }}
+            onNavigate={handleNavigate}
           />
         );
 
@@ -252,7 +269,7 @@ function App() {
             }
           />
 
-          <main className="px-4 py-5 sm:px-6 lg:px-8">
+          <main className="min-h-[calc(100vh-72px)] p-4 md:p-6 lg:p-8">
             {renderPage()}
           </main>
         </div>
